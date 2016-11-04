@@ -1,0 +1,131 @@
+# -*- sh -*-
+#
+# Bash completion function for the 'tshark' command.
+#
+# -ac
+# --
+# http://github.com/acole76
+#
+#
+# NOTE: this code isn't fully functional
+
+_tshark()
+{
+	# dubugging -x=on, +x=off
+	# 	-x = on
+	# 	+x = off
+	set +x
+
+	COMPREPLY=()
+	cur=${COMP_WORDS[COMP_CWORD]}
+	prev=${COMP_WORDS[COMP_CWORD-1]}
+
+	#
+	#  All known commands accepted.  Sorted.
+	#
+	opts='-2 -a -b -B -c -C -d -D -e -E -f -F -g -h -H -i -I -K -l -L -n -N -o -O -p -P -q -Q -r -R -s -S -t -T -u -v -V -w -W -x -X -y -Y -z --capture-comment'
+	
+	case "$prev" in
+		-a)
+			# -a Specify a criterion that specifies when TShark is to stop writing to a capture file.
+
+			COMPREPLY=( $(compgen -W "duration filesize files" -- "$cur") )
+			return 0
+			;;
+
+		-t)
+			# -t Set the format of the packet timestamp printed in summary lines.
+
+			COMPREPLY=( $(compgen -W "a ad adoy d dd e r u ud udoy" -- "$cur") )
+			return 0
+			;;
+
+		-T)
+			# -T Set the format of the output when viewing decoded packet data.
+
+			COMPREPLY=( $(compgen -W "fields pdml ps psml text" -- "$cur") )
+			return 0
+			;;
+
+		-i)
+			# -i causesSet the name of the network interface or pipe to use for live packet capture.
+
+			# netstat -i			linux command to show all network interfaces
+			# cut -f 1 -d " "		grabs the first field
+			# tail -n 2				ignores the first 2 lines.
+			# tr '\n' ' '			replace new lines w/ a space.  that's how compgen likes it
+			COMPREPLY=( $(compgen -W "$(netstat -i | cut -f 1 -d " " | tail -n 2 | tr '\n' ' ')" -- "$cur") )
+			return 0
+			;;
+
+		-O)
+			# -O causes TShark to only show a detailed view of the comma-separated list of protocols.
+
+			# tshark -G protocols		built-in tshark option to list all protocols
+			# awk '{print $NF}'			grabs the last field
+			# sort						sorts, duh.
+			# tr '\n' ' '				replace new lines with a space.  that's how compgen likes it
+			COMPREPLY=( $(compgen -W "$(tshark -G protocols | awk '{print $NF}' | sort | tr '\n' ' ')" -- "$cur") )
+			return 0
+			;;
+
+		-E)
+			# -E Set an option controlling the printing of fields when -T fields is selected.
+
+			COMPREPLY=( $(compgen -W "header seperator occurrence aggregator quote" -- "$cur") )
+			return 0
+			;;
+
+		-C|-H|-r|-w)
+			# return file names			
+			COMPREPLY=( $( compgen -f -- $cur ) )
+			return 0
+			;;
+
+		-e|-Y)
+			# -e Add a field to the list of fields to display if -T fields is selected.
+			# -Y Cause the specified filter to be applied
+
+			#stmt=$(echo ${cur} | awk '{$NF=""; print $0}' | sed "s/'//g" | sed 's/"//g') #everything before command being typed
+
+			# comb: is the nth command being typed. Example below.
+			#		tshark -Y 'http.host contains "google" and http.reque[tab][tab]
+			#		comb would equal "http.reque"
+			#
+			#	echo ${cur} 		pipes cur to next cmd
+			#	awk '{print $NF}'	looks only at the last word that was typed
+			#	sed 's/\./\\./g'	escapes the dot for use in grep. ex: tcp.options -> tcp\.options
+			#	sed "s/'//g"		removes single quotes
+			comb=$(echo ${cur} | awk '{print $NF}' | sed "s/'//g" | sed 's/"//g')
+
+			# term: is the current word modified for use in the COMREPLY cmd
+			#	echo ${cur} 		pipes cur to next cmd
+			#	awk '{print $NF}'	looks only at the last word that was typed
+			#	sed 's/\./\\./g'	escapes the dot for use in grep. ex: tcp.options -> tcp\.options
+			#	sed "s/'//g"		removes single quotes
+			#	sed 's/"//g'		remove quotes
+			term=$(echo ${cur} | awk '{print $NF}' | sed 's/\./\\./g' | sed "s/'//g" | sed 's/"//g')
+
+			# tshark -G fields		built-in tshark option to list all fields & protocols
+			# cut -d$'\t' -f 3		tshark output is tab delimited, this grabs the 3rd field
+			# grep "^${term}"		return the values that begin with current word
+			# sort					sorts, duh.
+			# tr '\n' ' '			replace new lines with a space.  that's how compgen likes it
+			flds=$(tshark -G fields | cut -d$'\t' -f 3 | grep "^${term}" | sort | tr '\n' ' ')
+			COMPREPLY=( $(compgen -W "$flds" -- "$comb") )
+
+			return 0
+			;;
+	esac
+
+	#
+	#  This is a "sometimes working" way to get bash completion when no switch is provided (capture filter).
+	#
+	if [ $COMP_CWORD -eq 1 ]; then
+		term=$(echo ${cur} | sed 's/\./\\./g')
+		COMPREPLY=( $(compgen -W "$(tshark -G fields | cut -d$'\t' -f 3 | grep "^${term}" | sort | tr '\n' ' ')" -- "*${cur}") )
+		return 0
+	fi
+}
+
+complete -F _tshark tshark
